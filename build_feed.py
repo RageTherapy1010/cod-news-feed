@@ -3,9 +3,8 @@ import calendar
 import datetime
 import email.utils
 import html
+import json
 import re
-import time
-import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -14,16 +13,19 @@ from html.parser import HTMLParser
 import feedparser
 
 
-# --------------------------------------------------
+# ==================================================
 # SETTINGS
-# --------------------------------------------------
+# ==================================================
 
 DAYS_BACK = 14
 MAX_ARTICLES = 60
-USER_AGENT = "Mozilla/5.0 (compatible; RageTherapyCODNews/1.0)"
+MAX_PAGE_ARTICLES = 15
 
-# General RSS feeds are filtered so that only COD
-# articles can enter the final feed.
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
+)
+
 RSS_SOURCES = {
     "Dexerto": "https://www.dexerto.com/feed/",
     "GamesRadar+": "https://www.gamesradar.com/feeds.xml",
@@ -31,27 +33,35 @@ RSS_SOURCES = {
     "VGC": "https://www.videogameschronicle.com/feed/",
 }
 
-# These pages contain Call of Duty-specific articles.
 COD_PAGES = {
     "Official Call of Duty": "https://www.callofduty.com/blog",
     "Dexerto": "https://www.dexerto.com/call-of-duty/",
-    "GamesRadar+": "https://www.gamesradar.com/games/fps/call-of-duty/",
+    "GamesRadar+": (
+        "https://www.gamesradar.com/games/fps/call-of-duty/"
+    ),
 }
 
-COD_TERMS = [
+# Specific COD names and titles.
+# We deliberately do not accept vague terms like
+# "DMZ" or "Zombies" on their own.
+
+COD_TITLE_TERMS = [
     "call of duty",
     "modern warfare",
     "black ops",
     "warzone",
     "cod mobile",
     "codm",
-    "dmz",
-    "ricochet anti-cheat",
     "mw4",
-    "bo7",
-    "blackout",
+    "mwiii",
+    "mwii",
+    "mw3",
+    "mw2",
+    "black ops 7",
+    "black ops 6",
 ]
 
+# Exclude unconfirmed information and leaks.
 EXCLUDED_TERMS = [
     "rumour",
     "rumor",
@@ -66,47 +76,75 @@ EXCLUDED_TERMS = [
     "unverified",
     "supposedly",
     "allegedly",
+    "reportedly",
+    "rumored to",
+    "rumoured to",
+]
+
+# Exclude general industry/personnel stories.
+EXCLUDED_INDUSTRY_TERMS = [
+    "laid off",
+    "layoffs",
+    "layoff",
+    "job cuts",
+    "jobs cut",
+    "hiring",
+    "hired",
+    "hire",
+    "restructuring",
+    "former boss",
+    "former producer",
+    "former developer",
+    "former director",
+]
+
+# Exclude hypothetical or speculative headlines.
+EXCLUDED_SPECULATION_TERMS = [
+    "might have",
+    "could have",
+    "would have",
+    "what if",
+    "if an experiment",
 ]
 
 
-# --------------------------------------------------
-# HTML HELPERS
-# --------------------------------------------------
+# ==================================================
+# HTML PARSERS
+# ==================================================
 
 class LinkParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.links = []
-        self.current_link = None
+        self.current = None
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
 
         if tag == "a" and attrs.get("href"):
-            self.current_link = {
+            self.current = {
                 "url": attrs["href"],
                 "title": "",
             }
 
-        if tag == "br" and self.current_link:
-            self.current_link["title"] += " "
-
     def handle_data(self, data):
-        if self.current_link:
-            self.current_link["title"] += data
+        if self.current is not None:
+            self.current["title"] += data + " "
 
     def handle_endtag(self, tag):
-        if tag == "a" and self.current_link:
-            title = clean_text(self.current_link["title"])
+        if tag == "a" and self.current is not None:
+            title = clean_text(self.current["title"])
 
             if title:
-                self.current_link["title"] = title
-                self.links.append(self.current_link)
+                self.links.append({
+                    "url": self.current["url"],
+                    "title": title,
+                })
 
-            self.current_link = None
+            self.current = None
 
 
-class ArticleMetadataParser(HTMLParser):
+class MetadataParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.metadata = {}
@@ -133,9 +171,9 @@ class ArticleMetadataParser(HTMLParser):
             )
 
 
-# --------------------------------------------------
+# ==================================================
 # GENERAL HELPERS
-# --------------------------------------------------
+# ==================================================
 
 def clean_text(value):
     value = html.unescape(str(value or ""))
@@ -147,7 +185,13 @@ def clean_text(value):
 def fetch_url(url):
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": USER_AGENT}
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": (
+                "text/html,application/rss+xml,"
+                "application/xml;q=0.9,*/*;q=0.8"
+            ),
+        },
     )
 
     with urllib.request.urlopen(request, timeout=25) as response:
@@ -173,7 +217,7 @@ def parse_date(value):
 
     try:
         parsed = datetime.datetime.fromisoformat(
-            value.replace("Z", "+00:00")
+            str(value).replace("Z", "+00:00")
         )
 
         if parsed.tzinfo is None:
@@ -187,16 +231,23 @@ def parse_date(value):
         return None
 
 
-def is_call_of_duty(title, description=""):
-    text = (title + " " + description).lower()
+def feedparser_date(entry):
+    for key in ("published_parsed", "updated_parsed"):
+        value = entry.get(key)
 
-    return any(term in text for term in COD_TERMS)
+        if value:
+            try:
+                timestamp = calendar.timegm(value)
+                return datetime.datetime.fromtimestamp(
+                    timestamp,
+                    datetime.timezone.utc
+                )
+            except Exception:
+                pass
 
-
-def is_excluded(title, description=""):
-    text = (title + " " + description).lower()
-
-    return any(term in text for term in EXCLUDED_TERMS)
+    return parse_date(
+        entry.get("published") or entry.get("updated")
+    )
 
 
 def is_recent(published):
@@ -206,7 +257,42 @@ def is_recent(published):
     now = datetime.datetime.now(datetime.timezone.utc)
     cutoff = now - datetime.timedelta(days=DAYS_BACK)
 
-    return cutoff <= published <= now + datetime.timedelta(days=1)
+    return cutoff <= published <= (
+        now + datetime.timedelta(days=1)
+    )
+
+
+def is_cod_title(title):
+    title = clean_text(title).lower()
+
+    return any(
+        term in title
+        for term in COD_TITLE_TERMS
+    )
+
+
+def is_excluded(title):
+    title = clean_text(title).lower()
+
+    excluded = (
+        EXCLUDED_TERMS
+        + EXCLUDED_INDUSTRY_TERMS
+        + EXCLUDED_SPECULATION_TERMS
+    )
+
+    return any(term in title for term in excluded)
+
+
+def clean_link(url):
+    parsed = urllib.parse.urlsplit(url)
+
+    return urllib.parse.urlunsplit((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        "",
+        "",
+    ))
 
 
 def make_article(title, link, description, published, source):
@@ -216,27 +302,28 @@ def make_article(title, link, description, published, source):
     if not title or not link or not published:
         return None
 
+    # Only COD-specific headlines are accepted.
+    if not is_cod_title(title):
+        return None
+
+    if is_excluded(title):
+        return None
+
     if not is_recent(published):
-        return None
-
-    if not is_call_of_duty(title, description):
-        return None
-
-    if is_excluded(title, description):
         return None
 
     return {
         "title": title,
-        "link": link,
+        "link": clean_link(link),
         "description": description,
         "published": published,
         "source": source,
     }
 
 
-# --------------------------------------------------
-# RSS SOURCES
-# --------------------------------------------------
+# ==================================================
+# RSS FEEDS
+# ==================================================
 
 def read_rss_source(source, url):
     articles = []
@@ -251,26 +338,18 @@ def read_rss_source(source, url):
         print("Articles received:", len(feed.entries))
 
         for entry in feed.entries:
-            title = clean_text(entry.get("title", ""))
+            title = entry.get("title", "")
             link = entry.get("link", "")
+            description = entry.get("summary", "")
 
-            description = clean_text(
-                entry.get("summary", "")
-            )
-
-            date_value = (
-                entry.get("published")
-                or entry.get("updated")
-            )
-
-            published = parse_date(date_value)
+            published = feedparser_date(entry)
 
             article = make_article(
                 title,
                 link,
                 description,
                 published,
-                source
+                source,
             )
 
             if article:
@@ -284,9 +363,94 @@ def read_rss_source(source, url):
     return articles
 
 
-# --------------------------------------------------
+# ==================================================
+# JSON-LD PUBLICATION DATE EXTRACTION
+# ==================================================
+
+def find_json_dates(data):
+    dates = []
+
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if key.lower() in (
+                "datepublished",
+                "datecreated",
+            ):
+                parsed = parse_date(value)
+
+                if parsed:
+                    dates.append(parsed)
+
+            elif isinstance(value, (dict, list)):
+                dates.extend(find_json_dates(value))
+
+    elif isinstance(data, list):
+        for item in data:
+            dates.extend(find_json_dates(item))
+
+    return dates
+
+
+def get_jsonld_dates(page_html):
+    dates = []
+
+    scripts = re.findall(
+        r'<script[^>]*type=["\']application/ld\+json'
+        r'["\'][^>]*>(.*?)</script>',
+        page_html,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    for script in scripts:
+        try:
+            data = json.loads(script.strip())
+            dates.extend(find_json_dates(data))
+        except Exception:
+            continue
+
+    return dates
+
+
+def get_article_metadata(page_html):
+    parser = MetadataParser()
+    parser.feed(page_html)
+
+    metadata = parser.metadata
+
+    title = (
+        metadata.get("og:title")
+        or metadata.get("twitter:title")
+        or metadata.get("title")
+        or ""
+    )
+
+    description = (
+        metadata.get("og:description")
+        or metadata.get("description")
+        or ""
+    )
+
+    date_value = (
+        metadata.get("article:published_time")
+        or metadata.get("datepublished")
+        or metadata.get("date")
+        or metadata.get("time")
+    )
+
+    published = parse_date(date_value)
+
+    if not published:
+        json_dates = get_jsonld_dates(page_html)
+
+        if json_dates:
+            published = max(json_dates)
+
+    return title, description, published
+
+
+# ==================================================
 # COD-SPECIFIC WEBSITE PAGES
-# --------------------------------------------------
+# ==================================================
 
 def read_cod_page(source, page_url):
     articles = []
@@ -295,96 +459,89 @@ def read_cod_page(source, page_url):
     print("URL:", page_url)
 
     try:
-        page_content = fetch_url(page_url).decode(
+        page_html = fetch_url(page_url).decode(
             "utf-8",
-            errors="replace"
+            errors="replace",
         )
 
         parser = LinkParser()
-        parser.feed(page_content)
+        parser.feed(page_html)
+
+        page_host = urllib.parse.urlparse(
+            page_url
+        ).netloc.lower()
 
         candidates = []
-        seen_links = set()
+        seen = set()
 
         for item in parser.links:
-            title = item["title"]
-
             link = urllib.parse.urljoin(
                 page_url,
-                item["url"]
+                item["url"],
             )
 
-            if not link.startswith("http"):
+            parsed = urllib.parse.urlparse(link)
+            host = parsed.netloc.lower()
+
+            if host != page_host:
                 continue
 
-            if link in seen_links:
+            if not is_cod_title(item["title"]):
                 continue
 
-            seen_links.add(link)
-
-            if not is_call_of_duty(title):
+            # Avoid the category page itself.
+            if clean_link(link) == clean_link(page_url):
                 continue
 
-            # Only inspect article links from the
-            # website being checked.
-            if urllib.parse.urlparse(link).netloc != (
-                urllib.parse.urlparse(page_url).netloc
-            ):
+            link = clean_link(link)
+
+            if link in seen:
                 continue
+
+            seen.add(link)
 
             candidates.append({
-                "title": title,
+                "title": item["title"],
                 "link": link,
             })
 
         print("COD article links found:", len(candidates))
 
-        # Limit requests so the workflow does not
-        # overload the websites.
-        for item in candidates[:12]:
+        for item in candidates[:MAX_PAGE_ARTICLES]:
             try:
                 article_html = fetch_url(
                     item["link"]
-                ).decode("utf-8", errors="replace")
-
-                metadata_parser = ArticleMetadataParser()
-                metadata_parser.feed(article_html)
-
-                metadata = metadata_parser.metadata
-
-                title = (
-                    metadata.get("og:title")
-                    or metadata.get("twitter:title")
-                    or item["title"]
+                ).decode(
+                    "utf-8",
+                    errors="replace",
                 )
 
-                description = (
-                    metadata.get("og:description")
-                    or metadata.get("description")
-                    or ""
+                title, description, published = (
+                    get_article_metadata(article_html)
                 )
 
-                date_value = (
-                    metadata.get("article:published_time")
-                    or metadata.get("date")
-                    or metadata.get("time")
-                )
-
-                published = parse_date(date_value)
+                # Use the page link's title if metadata
+                # does not provide an article headline.
+                if not title:
+                    title = item["title"]
 
                 article = make_article(
                     title,
                     item["link"],
                     description,
                     published,
-                    source
+                    source,
                 )
 
                 if article:
                     articles.append(article)
 
             except Exception as error:
-                print("ARTICLE ERROR:", item["link"], error)
+                print(
+                    "ARTICLE ERROR:",
+                    item["link"],
+                    error,
+                )
 
     except Exception as error:
         print("PAGE ERROR:", source, error)
@@ -394,17 +551,18 @@ def read_cod_page(source, page_url):
     return articles
 
 
-# --------------------------------------------------
-# BUILD FINAL RSS FEED
-# --------------------------------------------------
+# ==================================================
+# BUILD RSS FILE
+# ==================================================
 
 def build_feed():
     all_articles = []
 
     print("Starting COD news feed build...")
-    print("Only recent Call of Duty articles are accepted.")
+    print("Strict COD headline filtering is enabled.")
+    print("Rumours, leaks and industry-only stories are excluded.")
 
-    # Read RSS sources.
+    # Read RSS feeds.
     for source, url in RSS_SOURCES.items():
         all_articles.extend(
             read_rss_source(source, url)
@@ -416,7 +574,7 @@ def build_feed():
             read_cod_page(source, url)
         )
 
-    # Remove duplicate links.
+    # Deduplicate articles.
     unique_articles = {}
 
     for article in all_articles:
@@ -426,8 +584,8 @@ def build_feed():
 
     # Newest articles first.
     articles.sort(
-        key=lambda item: item["published"],
-        reverse=True
+        key=lambda article: article["published"],
+        reverse=True,
     )
 
     articles = articles[:MAX_ARTICLES]
@@ -437,41 +595,51 @@ def build_feed():
     channel = ET.SubElement(rss, "channel")
 
     ET.SubElement(
-        channel, "title"
+        channel,
+        "title",
     ).text = "Rage Therapy - Call of Duty News"
 
     ET.SubElement(
-        channel, "link"
-    ).text = "https://github.com/RageTherapy1010/cod-news-feed"
+        channel,
+        "link",
+    ).text = (
+        "https://github.com/RageTherapy1010/cod-news-feed"
+    )
 
     ET.SubElement(
-        channel, "description"
+        channel,
+        "description",
     ).text = (
         "Recent Call of Duty news from official "
         "and reputable gaming sources."
     )
 
     ET.SubElement(
-        channel, "language"
+        channel,
+        "language",
     ).text = "en"
 
     for article in articles:
         item = ET.SubElement(channel, "item")
 
         ET.SubElement(
-            item, "title"
+            item,
+            "title",
         ).text = article["title"]
 
         ET.SubElement(
-            item, "link"
+            item,
+            "link",
         ).text = article["link"]
 
         ET.SubElement(
-            item, "guid"
+            item,
+            "guid",
         ).text = article["link"]
 
         ET.SubElement(
-            item, "description"
+            item,
+            "description",
         ).text = (
             article["description"]
             + " | Source: "
@@ -479,7 +647,8 @@ def build_feed():
         )
 
         ET.SubElement(
-            item, "pubDate"
+            item,
+            "pubDate",
         ).text = email.utils.format_datetime(
             article["published"]
         )
@@ -490,7 +659,7 @@ def build_feed():
     tree.write(
         "rss.xml",
         encoding="utf-8",
-        xml_declaration=True
+        xml_declaration=True,
     )
 
     print("\n--------------------------------")
@@ -498,13 +667,13 @@ def build_feed():
     print("RSS feed successfully generated.")
     print("--------------------------------")
 
-    for article in articles[:10]:
+    for article in articles:
         print(
             article["published"].strftime("%Y-%m-%d"),
             "|",
             article["source"],
             "|",
-            article["title"]
+            article["title"],
         )
 
 
