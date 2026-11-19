@@ -48,17 +48,23 @@ for source, url in SOURCES.items():
         )
 
         with urllib.request.urlopen(request, timeout=30) as response:
-            status = response.status
+            print(f"HTTP status: {response.status}")
             feed_content = response.read()
-
-        print(f"HTTP status: {status}")
 
         feed = feedparser.parse(feed_content)
 
         print(f"Articles received: {len(feed.entries)}")
 
         if feed.bozo:
-            print(f"Feed error: {feed.bozo_exception}")
+            print(f"Feed warning: {feed.bozo_exception}")
+
+        print(f"\nFIRST FIVE ARTICLES FROM {source}:")
+
+        for entry in feed.entries[:5]:
+            title = entry.get("title", "").strip()
+            published = entry.get("published", "No publication date")
+            print(f"TITLE: {title}")
+            print(f"DATE: {published}")
 
         for entry in feed.entries:
             title = entry.get("title", "").strip()
@@ -111,11 +117,6 @@ sorted_articles = sorted(
     key=lambda item: item["published"],
     reverse=True
 )[:MAX_ITEMS]
-
-print("\nFIRST FIVE ARTICLES FOUND:")
-
-for article in sorted_articles[:5]:
-    print(f"ARTICLE: {article['title']}")
 
 rss = ET.Element("rss", version="2.0")
 channel = ET.SubElement(rss, "channel")
