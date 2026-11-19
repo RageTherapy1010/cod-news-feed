@@ -4,6 +4,8 @@ import datetime
 import email.utils
 import html
 import re
+import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 
 import feedparser
@@ -34,16 +36,29 @@ now = datetime.datetime.now(datetime.timezone.utc)
 cutoff = now - datetime.timedelta(days=DAYS_BACK)
 
 articles = {}
-checked = []
 
 for source, url in SOURCES.items():
-    try:
-        feed = feedparser.parse(url)
-        checked.append(source)
+    print(f"\nSOURCE: {source}")
+    print(f"URL: {url}")
 
-        if feed.bozo and not feed.entries:
-            print(f"Warning: Could not read {source} feed.")
-            continue
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        with urllib.request.urlopen(request, timeout=30) as response:
+            status = response.status
+            feed_content = response.read()
+
+        print(f"HTTP status: {status}")
+
+        feed = feedparser.parse(feed_content)
+
+        print(f"Articles received: {len(feed.entries)}")
+
+        if feed.bozo:
+            print(f"Feed error: {feed.bozo_exception}")
 
         for entry in feed.entries:
             title = entry.get("title", "").strip()
@@ -84,14 +99,23 @@ for source, url in SOURCES.items():
                 "source": source,
             }
 
+    except urllib.error.HTTPError as error:
+        print(f"HTTP status: {error.code}")
+        print(f"Feed error: {error}")
+
     except Exception as error:
-        print(f"Error checking {source}: {error}")
+        print(f"Feed error: {error}")
 
 sorted_articles = sorted(
     articles.values(),
     key=lambda item: item["published"],
     reverse=True
 )[:MAX_ITEMS]
+
+print("\nFIRST FIVE ARTICLES FOUND:")
+
+for article in sorted_articles[:5]:
+    print(f"ARTICLE: {article['title']}")
 
 rss = ET.Element("rss", version="2.0")
 channel = ET.SubElement(rss, "channel")
@@ -125,6 +149,7 @@ tree.write(
     xml_declaration=True
 )
 
-print(f"Sources checked: {', '.join(checked)}")
-print(f"Articles found: {len(sorted_articles)}")
+print("\n------------------------------")
+print(f"Total COD articles found: {len(sorted_articles)}")
 print("RSS feed successfully generated.")
+print("------------------------------")
