@@ -3,7 +3,7 @@
   <channel>
     <title>Rage Therapy - COD News</title>
     <link>https://github.com/RageTherapy1010/cod-news-feed</link>
-    <description>Recent Call of Duty news, updates and announcements.</description>
+    <description>Recent Call of Duty news, updates, guides and tips.</description>
     <language>en</language>
     <item>
       <title>Modern Warfare 4 increased SBMM in DMZ despite multiplayer backlash: Report - Dexerto</title>
@@ -29,22 +29,6 @@
       <source>Official Call of Duty</source>
     </item>
     <item>
-      <title>Call of Duty Series News, Reviews and Guides | GamesRadar+</title>
-      <link>https://www.gamesradar.com/uk/games/fps/call-of-duty</link>
-      <guid>https://www.gamesradar.com/uk/games/fps/call-of-duty</guid>
-      <pubDate>Mon, 16 Nov 2026 12:44:55 +0000</pubDate>
-      <source>GamesRadar+</source>
-      <description>News, reviews and guides for games in the Call of Duty series, compiled by the Gamesradar+ team.</description>
-    </item>
-    <item>
-      <title>Call of Duty Series News, Reviews and Guides | GamesRadar+</title>
-      <link>https://www.gamesradar.com/au/games/fps/call-of-duty</link>
-      <guid>https://www.gamesradar.com/au/games/fps/call-of-duty</guid>
-      <pubDate>Mon, 16 Nov 2026 12:44:55 +0000</pubDate>
-      <source>GamesRadar+</source>
-      <description>News, reviews and guides for games in the Call of Duty series, compiled by the Gamesradar+ team.</description>
-    </item>
-    <item>
       <title>Call of Duty Endowment marks Remembrance Day with veterans' Valor Pack push</title>
       <link>https://www.eurogamer.net/call-of-duty-endowment-valor-pack-remembrance-day-veterans</link>
       <guid>https://www.eurogamer.net/call-of-duty-endowment-valor-pack-remembrance-day-veterans</guid>
@@ -53,12 +37,44 @@
       <description>The Call of Duty Endowment is marking Remembrance Day and its 17th anniversary by encouraging Modern Warfare 4 and Warzone players to pick up its Valor Pack, with all of Activision's net proceeds going towards helping veterans find jobs. Read more</description>
     </item>
     <item>
+      <title>Where to find MW4 DMZ Blackmarket Lockers and how to get the keys</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-blackmarket-locker-locations</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-blackmarket-locker-locations</guid>
+      <pubDate>Fri, 13 Nov 2026 11:58:25 +0000</pubDate>
+      <source>GamesRadar+</source>
+      <description>If you've secured a DMZ Blackmarket Locker key, here are all the locations at which you can use it</description>
+    </item>
+    <item>
+      <title>All MW4 DMZ keys and where to use them</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-keys-locations</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-keys-locations</guid>
+      <pubDate>Thu, 12 Nov 2026 14:44:00 +0000</pubDate>
+      <source>GamesRadar+</source>
+      <description>When you find and earn one of the many MW4 DMZ keys, here's where you need to go to use it</description>
+    </item>
+    <item>
       <title>Warzone players blocked from multiplayer for using apps to find easy lobbies - Dexerto</title>
       <link>https://www.dexerto.com/call-of-duty/warzone-players-blocked-from-multiplayer-for-using-apps-to-find-easy-lobbies-3427019</link>
       <guid>https://www.dexerto.com/call-of-duty/warzone-players-blocked-from-multiplayer-for-using-apps-to-find-easy-lobbies-3427019</guid>
       <pubDate>Tue, 10 Nov 2026 15:10:29 +0000</pubDate>
       <source>Dexerto</source>
       <description>Activision blocked Warzone Agent from multiplayer in Season 1, and players who try to get around it risk hardware bans.</description>
+    </item>
+    <item>
+      <title>How to get more MW4 2XP tokens and other ways to level up fast</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/mw4-double-xp-tokens</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/mw4-double-xp-tokens</guid>
+      <pubDate>Tue, 10 Nov 2026 11:10:40 +0000</pubDate>
+      <source>GamesRadar+</source>
+      <description>Stock up on MW4 Double XP tokens and level up your career, your weapons, and your Battle Pass progress</description>
+    </item>
+    <item>
+      <title>MW4 DMZ bank vault locations and how to access them</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-bank-vault</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-bank-vault</guid>
+      <pubDate>Mon, 09 Nov 2026 13:17:13 +0000</pubDate>
+      <source>GamesRadar+</source>
+      <description>If you pick up a DMZ bank vault keycard, you must first power the keycard reader and find a code</description>
     </item>
     <item>
       <title>New Warzone mode lets you buy Nuke for $1,000,000 to end the game - Dexerto</title>
