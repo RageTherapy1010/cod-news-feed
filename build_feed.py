@@ -93,6 +93,15 @@ EXCLUDED_TERMS = [
     "canceled project",
 ]
 
+# Exclude historical hypothetical stories about old experiments.
+# This requires both hypothetical wording and an experiment/concept reference.
+HISTORICAL_SPECULATION_PATTERNS = [
+    r"\b(might|could|would)\s+have\b.*\b(experiment|prototype|concept)\b",
+    r"\b(if|had)\b.*\b(experiment|prototype|concept)\b.*\b(panned out|worked out|gone ahead)\b",
+    r"\b(experiment|prototype|concept)\b.*\b(panned out|worked out|never happened|scrapped)\b",
+    r"\bwhat if\b.*\b(call of duty|modern warfare|black ops|warzone)\b",
+]
+
 CATEGORY_TITLES = [
     "call of duty series news",
     "call of duty news, reviews and guides",
@@ -154,6 +163,16 @@ def contains_any(text, terms):
     return any(term in text for term in terms)
 
 
+def is_historical_speculation(title):
+    lower_title = clean_text(title).lower()
+
+    for pattern in HISTORICAL_SPECULATION_PATTERNS:
+        if re.search(pattern, lower_title):
+            return True
+
+    return False
+
+
 def is_valid_cod_news(title, url=""):
     title = clean_text(title)
     lower_title = title.lower()
@@ -165,6 +184,9 @@ def is_valid_cod_news(title, url=""):
         return False
 
     if contains_any(lower_title, EXCLUDED_TERMS):
+        return False
+
+    if is_historical_speculation(title):
         return False
 
     if any(
@@ -406,14 +428,12 @@ def is_article_url(source, url):
         return False
 
     if source == "Official Call of Duty":
-        # Only dated blog and patch-notes article URLs.
         return (
             re.search(r"/(blog|patchnotes)/\d{4}/\d{2}/", parsed.path)
             is not None
         )
 
     if source == "Dexerto":
-        # Dexerto COD articles normally end in a numeric article ID.
         return (
             len(parts) >= 2
             and parts[0] == "call-of-duty"
@@ -421,7 +441,6 @@ def is_article_url(source, url):
         )
 
     if source == "GamesRadar+":
-        # Reject the category landing page and regional copies.
         try:
             index = parts.index("call-of-duty")
         except ValueError:
@@ -554,7 +573,6 @@ def read_cod_pages(articles):
                 f"Possible article links found: {len(article_links)}"
             )
 
-            # Limit page requests to avoid excessive scraping.
             for article_url in article_links[:100]:
                 details = get_page_details(article_url)
 
@@ -672,8 +690,8 @@ def main():
     print("Starting COD news feed build...")
     print("COD news and guide filtering is enabled.")
     print(
-        "Rumours, leaks, employment stories and unrelated "
-        "incidents are excluded."
+        "Rumours, leaks, employment stories, unrelated incidents "
+        "and historical speculation are excluded."
     )
     print(
         "News, updates, patch notes, guides and tips are included."
