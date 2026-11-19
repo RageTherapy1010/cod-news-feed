@@ -1,8 +1,100 @@
 <?xml version='1.0' encoding='utf-8'?>
 <rss version="2.0">
   <channel>
-    <title>Call of Duty News</title>
+    <title>Rage Therapy - Call of Duty News</title>
     <link>https://github.com/RageTherapy1010/cod-news-feed</link>
-    <description>Latest Call of Duty news from MP1st and Insider Gaming</description>
+    <description>Recent Call of Duty news from official and reputable gaming sources.</description>
+    <language>en</language>
+    <item>
+      <title>Modern Warfare 4 increased SBMM in DMZ despite multiplayer backlash: Report - Dexerto</title>
+      <link>https://www.dexerto.com/call-of-duty/modern-warfare-4-increased-sbmm-in-dmz-despite-multiplayer-backlash-report-3429314/</link>
+      <guid>https://www.dexerto.com/call-of-duty/modern-warfare-4-increased-sbmm-in-dmz-despite-multiplayer-backlash-report-3429314/</guid>
+      <description>Infinity Ward has reportedly tweaked Modern Warfare 4’s DMZ matchmaking to give player skill more weight when putting lobbies together. | Source: Dexerto</description>
+      <pubDate>Wed, 18 Nov 2026 10:32:22 +0000</pubDate>
+    </item>
+    <item>
+      <title>Call of Duty might have swapped guns and tanks for knights and swords if an Infinity Ward experiment had panned out</title>
+      <link>https://www.eurogamer.net/call-of-duty-medieval-prototype-infinity-ward</link>
+      <guid>https://www.eurogamer.net/call-of-duty-medieval-prototype-infinity-ward</guid>
+      <description>As much as Call of Duty is criticised for delivering the same thing every year, reports occasionally surface of attempts to take the series in bold new directions, even if none of these experiments have so far seen the light of day. And it turns out a medieval Call of Duty was also explored at one time. Read more | Source: Eurogamer</description>
+      <pubDate>Tue, 17 Nov 2026 12:49:20 +0000</pubDate>
+    </item>
+    <item>
+      <title>20-year Call of Duty veteran with credits on every Black Ops game laid off as Xbox restructuring continues: "I am proud and privileged to have worked alongside so many talented people"</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/20-year-call-of-duty-veteran-with-credits-on-every-black-ops-game-laid-off-as-xbox-restructuring-continues-i-am-proud-and-privileged-to-have-worked-alongside-so-many-talented-people/</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/20-year-call-of-duty-veteran-with-credits-on-every-black-ops-game-laid-off-as-xbox-restructuring-continues-i-am-proud-and-privileged-to-have-worked-alongside-so-many-talented-people/</guid>
+      <description>He was at Treyarch since 2006 | Source: GamesRadar+</description>
+      <pubDate>Mon, 16 Nov 2026 12:44:55 +0000</pubDate>
+    </item>
+    <item>
+      <title>EA hires another former Call of Duty boss to take the lead on all Battlefield Studios' projects</title>
+      <link>https://www.eurogamer.net/battlefield-call-of-duty-sam-cooper-byron-beede-live-service</link>
+      <guid>https://www.eurogamer.net/battlefield-call-of-duty-sam-cooper-byron-beede-live-service</guid>
+      <description>EA has made some notable leadership changes within its studios group, and in who oversees the Battlefield franchise. Byron Beede, previously Battlefield's general manager, has been promoted to group general manager. Read more | Source: Eurogamer</description>
+      <pubDate>Mon, 16 Nov 2026 09:24:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Treyarch lays off lead Call of Duty writer and Zombies veteran after "approximately 20 years" of service</title>
+      <link>https://www.eurogamer.net/craig-houston-layoff-treyarch-call-of-duty-layoffs</link>
+      <guid>https://www.eurogamer.net/craig-houston-layoff-treyarch-call-of-duty-layoffs</guid>
+      <description>Treyarch's former Senior lead writer, Craig Houston, has been laid off after approximately 20 years of service with the developer. In a post made to both his Twitter/X account and LinkedIn , the developer thanked fans for their support during his two decades with the company and confirmed he was impacted by recent reorganistation within the studio. Read more | Source: Eurogamer</description>
+      <pubDate>Sun, 15 Nov 2026 15:14:10 +0000</pubDate>
+    </item>
+    <item>
+      <title>Call of Duty Endowment marks Remembrance Day with veterans' Valor Pack push</title>
+      <link>https://www.eurogamer.net/call-of-duty-endowment-valor-pack-remembrance-day-veterans</link>
+      <guid>https://www.eurogamer.net/call-of-duty-endowment-valor-pack-remembrance-day-veterans</guid>
+      <description>The Call of Duty Endowment is marking Remembrance Day and its 17th anniversary by encouraging Modern Warfare 4 and Warzone players to pick up its Valor Pack, with all of Activision's net proceeds going towards helping veterans find jobs. Read more | Source: Eurogamer</description>
+      <pubDate>Sat, 14 Nov 2026 11:15:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Former Call of Duty producer says older games were “more fun” with less SBMM - Dexerto</title>
+      <link>https://www.dexerto.com/call-of-duty/former-call-of-duty-producer-says-older-games-were-more-fun-with-less-sbmm-3428002/</link>
+      <guid>https://www.dexerto.com/call-of-duty/former-call-of-duty-producer-says-older-games-were-more-fun-with-less-sbmm-3428002/</guid>
+      <description>Former Call of Duty producer Mark Rubin has criticized skill-based matchmaking, saying it makes casual matches feel repetitive. | Source: Dexerto</description>
+      <pubDate>Fri, 13 Nov 2026 12:47:12 +0000</pubDate>
+    </item>
+    <item>
+      <title>Where to find MW4 DMZ Blackmarket Lockers and how to get the keys</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-blackmarket-locker-locations/</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-blackmarket-locker-locations/</guid>
+      <description>If you've secured a DMZ Blackmarket Locker key, here are all the locations at which you can use it | Source: GamesRadar+</description>
+      <pubDate>Fri, 13 Nov 2026 11:58:25 +0000</pubDate>
+    </item>
+    <item>
+      <title>All MW4 DMZ keys and where to use them</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-keys-locations/</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-keys-locations/</guid>
+      <description>When you find and earn one of the many MW4 DMZ keys, here's where you need to go to use it | Source: GamesRadar+</description>
+      <pubDate>Thu, 12 Nov 2026 14:44:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Warzone players blocked from multiplayer for using apps to find easy lobbies - Dexerto</title>
+      <link>https://www.dexerto.com/call-of-duty/warzone-players-blocked-from-multiplayer-for-using-apps-to-find-easy-lobbies-3427019/</link>
+      <guid>https://www.dexerto.com/call-of-duty/warzone-players-blocked-from-multiplayer-for-using-apps-to-find-easy-lobbies-3427019/</guid>
+      <description>Activision blocked Warzone Agent from multiplayer in Season 1, and players who try to get around it risk hardware bans. | Source: Dexerto</description>
+      <pubDate>Tue, 10 Nov 2026 15:10:29 +0000</pubDate>
+    </item>
+    <item>
+      <title>Call of Duty conversation sparks bomb scare forcing plane and airport terminal to evacuate - Dexerto</title>
+      <link>https://www.dexerto.com/call-of-duty/call-of-duty-conversation-sparks-bomb-scare-forcing-plane-and-airport-terminal-to-evacuate-3426784/</link>
+      <guid>https://www.dexerto.com/call-of-duty/call-of-duty-conversation-sparks-bomb-scare-forcing-plane-and-airport-terminal-to-evacuate-3426784/</guid>
+      <description>A Call of Duty player’s conversation caused a bomb scare at a California airport, forcing passengers to evacuate their plane and part of the terminal. | Source: Dexerto</description>
+      <pubDate>Mon, 09 Nov 2026 19:48:33 +0000</pubDate>
+    </item>
+    <item>
+      <title>MW4 DMZ bank vault locations and how to access them</title>
+      <link>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-bank-vault/</link>
+      <guid>https://www.gamesradar.com/games/call-of-duty/mw4-dmz-bank-vault/</guid>
+      <description>If you pick up a DMZ bank vault keycard, you must first power the keycard reader and find a code | Source: GamesRadar+</description>
+      <pubDate>Mon, 09 Nov 2026 13:17:13 +0000</pubDate>
+    </item>
+    <item>
+      <title>All weapon buffs and nerfs in Modern Warfare 4 &amp; Warzone Season 1 - Dexerto</title>
+      <link>https://www.dexerto.com/call-of-duty/all-weapon-buffs-and-nerfs-in-modern-warfare-4-warzone-season-1-3425115/</link>
+      <guid>https://www.dexerto.com/call-of-duty/all-weapon-buffs-and-nerfs-in-modern-warfare-4-warzone-season-1-3425115/</guid>
+      <description>Here are all of the weapon buffs and nerfs in Modern Warfare 4 and Warzone Season 1. | Source: Dexerto</description>
+      <pubDate>Thu, 05 Nov 2026 21:19:51 +0000</pubDate>
+    </item>
   </channel>
 </rss>
