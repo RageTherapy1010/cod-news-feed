@@ -33,44 +33,112 @@ MW4_TERMS = [
     "mw4",
 ]
 
-RUMOUR_TERMS = [
+# These terms are only used to identify clearly speculative headlines.
+EXPLICIT_LEAK_TERMS = [
+    "leak",
+    "leaked",
+    "leaker",
+    "leaks",
+    "datamine",
+    "datamined",
+]
+
+EXPLICIT_RUMOUR_TERMS = [
     "rumour",
     "rumours",
     "rumor",
     "rumors",
-    "leak",
-    "leaked",
-    "leaker",
-    "leaks",
-    "datamine",
-    "datamined",
     "unconfirmed",
     "unverified",
     "allegedly",
+    "reportedly",
     "speculation",
     "speculative",
-    "insider",
-    "reportedly",
     "according to sources",
+    "sources claim",
+    "sources say",
+    "sources suggest",
+    "report claims",
+    "report says",
+    "reports suggest",
+    "reports claim",
+    "reportedly set to",
+    "reportedly getting",
+    "reportedly adding",
 ]
 
-LEAK_TERMS = [
-    "leak",
-    "leaked",
-    "leaker",
-    "leaks",
-    "datamine",
-    "datamined",
-]
-
+# These are rejected even if the article also mentions leaks or rumours.
 REJECTION_TERMS = [
     "debunked",
     "fake leak",
     "fake rumour",
     "fake rumor",
     "false leak",
+    "known issues",
+    "known issue",
+    "patch notes",
+    "patch note",
+    "hotfix notes",
+    "full patch notes",
+    "update notes",
+    "maintenance update",
+    "bug fixes",
+    "bug fix",
+    "how to",
+    "guide:",
+    "guide -",
+    "walkthrough",
+    "best loadout",
+    "best settings",
+    "all rewards",
+    "where to find",
+    "how to get",
+    "how to unlock",
 ]
 
+# Strong wording that usually indicates an official or confirmed announcement.
+CONFIRMED_TERMS = [
+    "officially announced",
+    "official announcement",
+    "officially confirmed",
+    "official confirmation",
+    "activision confirms",
+    "activision confirmed",
+    "activision announces",
+    "activision announced",
+    "infinity ward confirms",
+    "infinity ward confirmed",
+    "infinity ward announces",
+    "infinity ward announced",
+    "developers confirm",
+    "developer confirms",
+    "developers confirmed",
+    "developer confirmed",
+    "devs confirm",
+    "devs confirmed",
+    "now available",
+    "now live",
+    "is now live",
+    "has launched",
+    "official reveal",
+    "officially revealed",
+]
+
+# These phrases identify confirmed information in a description.
+CONFIRMED_DESCRIPTION_TERMS = [
+    "the developers confirmed",
+    "the developer confirmed",
+    "activision confirmed",
+    "infinity ward confirmed",
+    "officially confirmed",
+    "official announcement",
+    "has been officially announced",
+    "was officially announced",
+    "the official patch notes",
+    "according to the official patch notes",
+]
+
+# A speculative report needs a meaningful subject and uncertainty wording.
 REPORT_SUBJECTS = [
     "release date",
     "season",
@@ -84,8 +152,37 @@ REPORT_SUBJECTS = [
     "perks",
     "game mode",
     "game modes",
+    "ranked",
+    "dmz",
+    "content",
+    "feature",
+    "features",
     "mode",
     "modes",
+]
+
+SPECULATION_TERMS = [
+    "early",
+    "expected",
+    "expect",
+    "possible",
+    "possibly",
+    "potential",
+    "potentially",
+    "may",
+    "might",
+    "could",
+    "reportedly",
+    "allegedly",
+    "rumoured",
+    "rumored",
+    "according to",
+    "sources say",
+    "sources claim",
+    "sources suggest",
+    "reports suggest",
+    "report claims",
+    "report says",
 ]
 
 
@@ -167,39 +264,123 @@ def fetch_feed(url):
         return feedparser.parse(response.read())
 
 
-def identify_rumour(title, searchable):
-    # Clear leak and rumour wording.
-    if contains_any(searchable, RUMOUR_TERMS):
-        if contains_any(searchable, LEAK_TERMS):
-            return "LEAK"
+def resolve_article_link(url):
+    """
+    Try to follow Google News redirects so the RSS item links
+    directly to the original publisher's article.
+    If that fails, keep the supplied link.
+    """
+    if not url or "news.google.com/rss/articles/" not in url:
+        return url
 
-        return "RUMOUR"
+    try:
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": USER_AGENT},
+        )
 
-    # Speculative questions, such as:
-    # "Will Infinity Ward add a new DMZ mode?"
-    question_words = [
-        "will",
-        "could",
-        "might",
-        "may",
-        "would",
-        "what if",
+        with urllib.request.urlopen(request, timeout=15) as response:
+            final_url = response.geturl()
+
+        if final_url and "news.google.com" not in final_url:
+            return final_url
+
+    except Exception:
+        pass
+
+    return url
+
+
+def is_mw4_article(searchable):
+    return contains_any(searchable, MW4_TERMS)
+
+
+def is_confirmed_or_ordinary_news(title, description):
+    """
+    Reject known issues, patch notes, guides and clear official
+    announcements before considering an article a rumour.
+    """
+    title_text = normalise(title)
+    description_text = normalise(description)
+
+    if contains_any(title_text, REJECTION_TERMS):
+        return "known issues, guide, patch notes or rejected wording"
+
+    if contains_any(title_text, CONFIRMED_TERMS):
+        return "confirmed or official announcement wording"
+
+    if contains_any(description_text, CONFIRMED_DESCRIPTION_TERMS):
+        return "description indicates an official confirmation"
+
+    # Headlines containing these verbs are not automatically rumours.
+    # They must also contain explicit uncertainty wording to qualify.
+    official_verbs = [
+        "activision reveals",
+        "activision revealed",
+        "infinity ward reveals",
+        "infinity ward revealed",
+        "developers reveal",
+        "developer reveals",
+        "devs reveal",
+        "officially reveals",
+        "officially revealed",
     ]
 
-    if "?" in title and contains_any(searchable, question_words):
-        return "RUMOUR"
-
-    # Possible future dates, maps, weapons and other content
-    # described as reports rather than confirmed announcements.
-    if contains_any(searchable, ["report", "reports"]):
-        if contains_any(searchable, REPORT_SUBJECTS):
-            if contains_any(
-                searchable,
-                ["early", "late", "expected", "possible", "potential", "december", "january"],
-            ):
-                return "RUMOUR"
+    if contains_any(title_text, official_verbs):
+        return "official reveal wording"
 
     return None
+
+
+def identify_rumour(title, description):
+    """
+    Be deliberately strict:
+    - Explicit leak/datamine wording in the headline can qualify.
+    - Explicit rumour/unconfirmed wording in the headline can qualify.
+    - A speculative report needs uncertainty wording and a relevant subject.
+    - Questions alone are never enough.
+    """
+    title_text = normalise(title)
+    description_text = normalise(description)
+
+    if contains_any(title_text, EXPLICIT_LEAK_TERMS):
+        return "LEAK"
+
+    if contains_any(title_text, EXPLICIT_RUMOUR_TERMS):
+        return "RUMOUR"
+
+    # A generic question is not evidence of a rumour.
+    if "?" in title_text:
+        return None
+
+    # A report must have a relevant MW4 subject and clear uncertainty.
+    if contains_any(title_text, ["report", "reports"]):
+        if contains_any(title_text, REPORT_SUBJECTS):
+            if contains_any(title_text, SPECULATION_TERMS):
+                return "RUMOUR"
+
+            # "Early December reports", for example.
+            if re.search(r"\b(early|late)\s+[a-z]+\s+reports?\b", title_text):
+                return "RUMOUR"
+
+    # Some headlines use "expected" or "potential" without saying report.
+    if contains_any(title_text, SPECULATION_TERMS):
+        if contains_any(title_text, REPORT_SUBJECTS):
+            return "RUMOUR"
+
+    return None
+
+
+def get_original_source(entry, fallback):
+    source_info = entry.get("source", {})
+
+    if isinstance(source_info, dict):
+        source_title = source_info.get("title")
+
+        if source_title:
+            return clean_text(source_title)
+
+    return fallback
 
 
 def read_sources():
@@ -240,17 +421,23 @@ def read_sources():
             )
 
             url = entry.get("link", "")
-            searchable = normalise(title + " " + description)
-
             published = get_entry_date(entry)
 
-            if published and published < cutoff:
+            searchable = normalise(title + " " + description)
+
+            # The feed is limited to the last 14 days.
+            # Undated entries cannot be reliably checked, so reject them.
+            if not published:
+                stats["rejected"] += 1
+                continue
+
+            if published < cutoff:
                 stats["rejected"] += 1
                 continue
 
             stats["recent"] += 1
 
-            if not contains_any(searchable, MW4_TERMS):
+            if not is_mw4_article(searchable):
                 stats["rejected"] += 1
                 continue
 
@@ -259,29 +446,34 @@ def read_sources():
             print()
             print("MW4 ARTICLE:", title)
 
-            if contains_any(searchable, REJECTION_TERMS):
-                print("REJECTED: possible debunk or fake report")
+            rejection_reason = is_confirmed_or_ordinary_news(
+                title,
+                description,
+            )
+
+            if rejection_reason:
+                print("REJECTED:", rejection_reason)
                 stats["rejected"] += 1
                 continue
 
-            category = identify_rumour(title, searchable)
+            category = identify_rumour(title, description)
 
             if not category:
-                print("REJECTED: ordinary news, guide or update")
+                print("REJECTED: no clear evidence of a rumour or leak")
                 stats["rejected"] += 1
                 continue
 
-            original_source = source_name
+            original_source = get_original_source(
+                entry,
+                source_name,
+            )
 
-            if entry.get("source", {}).get("title"):
-                original_source = clean_text(
-                    entry.get("source", {}).get("title")
-                )
+            original_link = resolve_article_link(url)
 
             article = {
                 "title": title,
                 "description": description,
-                "link": url,
+                "link": original_link,
                 "published": published,
                 "source": original_source,
                 "category": category,
@@ -293,7 +485,7 @@ def read_sources():
 
             print("ACCEPTED:", category)
             print("SOURCE:", original_source)
-            print("LINK:", url)
+            print("LINK:", original_link)
 
         print()
         print("SOURCE RESULTS:")
@@ -303,18 +495,19 @@ def read_sources():
         print("ACCEPTED:", stats["accepted"])
         print("REJECTED:", stats["rejected"])
 
+    # Remove duplicate articles that appeared in multiple searches.
     unique_articles = {}
 
     for article in articles:
-        unique_articles[article["link"]] = article
+        link = article["link"]
+
+        if link not in unique_articles:
+            unique_articles[link] = article
 
     articles = list(unique_articles.values())
 
     articles.sort(
-        key=lambda article: article["published"]
-        or datetime.datetime.min.replace(
-            tzinfo=datetime.timezone.utc
-        ),
+        key=lambda article: article["published"],
         reverse=True,
     )
 
@@ -335,7 +528,8 @@ def create_rss(articles):
 
     ET.SubElement(channel, "description").text = (
         "Modern Warfare 4 rumours and leaks. "
-        "All unverified claims are clearly labelled."
+        "Posts are speculative reports, leaks or datamines, "
+        "not confirmed announcements."
     )
 
     ET.SubElement(channel, "language").text = "en"
@@ -353,18 +547,18 @@ def create_rss(articles):
         ET.SubElement(item, "guid").text = article["link"]
 
         description = (
-            "UNCONFIRMED - This report has not been independently "
-            "verified. Treat it as a rumour or leak.\n\n"
-            f"Source: {article['source']}\n\n"
+            "UNCONFIRMED - This is a speculative report, rumour "
+            "or leak and has not been independently verified. "
+            "It is not an official confirmation.\n\n"
+            f"Original source: {article['source']}\n\n"
             f"{article['description']}"
         )
 
         ET.SubElement(item, "description").text = description
 
-        if article["published"]:
-            ET.SubElement(item, "pubDate").text = (
-                email.utils.format_datetime(article["published"])
-            )
+        ET.SubElement(item, "pubDate").text = (
+            email.utils.format_datetime(article["published"])
+        )
 
     tree = ET.ElementTree(rss)
     ET.indent(tree, space="  ")
@@ -388,9 +582,9 @@ def main():
     print("Starting MW4 Rumours & Leaks collector...")
     print("Game filter: MODERN WARFARE 4 ONLY")
     print("Period: Last", DAYS_BACK, "days")
-    print("Speculative reports and leaks are included.")
-    print("Ordinary news and unrelated COD games are excluded.")
-    print("Unverified claims will be labelled.")
+    print("Only clearly speculative reports, leaks and datamines qualify.")
+    print("Confirmed announcements, guides and updates are excluded.")
+    print("All accepted posts will be labelled UNCONFIRMED.")
 
     articles = read_sources()
     create_rss(articles)
