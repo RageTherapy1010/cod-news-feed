@@ -6,7 +6,7 @@ import re
 import urllib.request
 import xml.etree.ElementTree as ET
 from html import unescape
-from urllib.parse import urlsplit, urlunsplit, urlencode
+from urllib.parse import urlencode
 
 import feedparser
 
@@ -15,12 +15,12 @@ DAYS_BACK = 14
 MAX_ARTICLES = 50
 OUTPUT_FILE = "cod-rumours.xml"
 
-USER_AGENT = "Mozilla/5.0 (compatible; RageTherapyMW4RSS/1.0)"
+USER_AGENT = "Mozilla/5.0 (compatible: RageTherapyMW4RSS/1.0)"
 
 GOOGLE_NEWS_SEARCHES = [
-    '"Modern Warfare 4" (leak OR leaked OR datamine OR rumour OR rumor OR unconfirmed)',
-    '"MW4" (leak OR leaked OR datamine OR rumour OR rumor OR unconfirmed)',
-    '"Modern Warfare IV" (leak OR leaked OR datamine OR rumour OR rumor)',
+    '"Modern Warfare 4" (leak OR leaked OR leaker OR datamine OR rumour OR rumor OR insider OR unconfirmed)',
+    '"MW4" (leak OR leaked OR leaker OR datamine OR rumour OR rumor OR insider OR unconfirmed)',
+    '"Modern Warfare IV" (leak OR leaked OR datamine OR rumour OR rumor OR insider)',
 ]
 
 RSS_SOURCES = {
@@ -35,18 +35,23 @@ MW4_TERMS = [
 
 RUMOUR_TERMS = [
     "rumour",
+    "rumours",
     "rumor",
+    "rumors",
     "leak",
     "leaked",
     "leaker",
     "leaks",
     "datamine",
+    "datamined",
     "unconfirmed",
     "unverified",
     "allegedly",
     "speculation",
-    "insider claims",
+    "speculative",
+    "insider",
     "reportedly",
+    "according to sources",
 ]
 
 LEAK_TERMS = [
@@ -55,6 +60,7 @@ LEAK_TERMS = [
     "leaker",
     "leaks",
     "datamine",
+    "datamined",
 ]
 
 REJECTION_TERMS = [
@@ -63,6 +69,23 @@ REJECTION_TERMS = [
     "fake rumour",
     "fake rumor",
     "false leak",
+]
+
+REPORT_SUBJECTS = [
+    "release date",
+    "season",
+    "map",
+    "maps",
+    "weapon",
+    "weapons",
+    "operator",
+    "operators",
+    "perk",
+    "perks",
+    "game mode",
+    "game modes",
+    "mode",
+    "modes",
 ]
 
 
@@ -95,14 +118,18 @@ def get_entry_date(entry):
 
     for field in ("published", "updated"):
         value = entry.get(field)
+
         if value:
             try:
                 parsed_date = email.utils.parsedate_to_datetime(value)
+
                 if parsed_date.tzinfo is None:
                     parsed_date = parsed_date.replace(
                         tzinfo=datetime.timezone.utc
                     )
+
                 return parsed_date.astimezone(datetime.timezone.utc)
+
             except (TypeError, ValueError):
                 pass
 
@@ -140,6 +167,41 @@ def fetch_feed(url):
         return feedparser.parse(response.read())
 
 
+def identify_rumour(title, searchable):
+    # Clear leak and rumour wording.
+    if contains_any(searchable, RUMOUR_TERMS):
+        if contains_any(searchable, LEAK_TERMS):
+            return "LEAK"
+
+        return "RUMOUR"
+
+    # Speculative questions, such as:
+    # "Will Infinity Ward add a new DMZ mode?"
+    question_words = [
+        "will",
+        "could",
+        "might",
+        "may",
+        "would",
+        "what if",
+    ]
+
+    if "?" in title and contains_any(searchable, question_words):
+        return "RUMOUR"
+
+    # Possible future dates, maps, weapons and other content
+    # described as reports rather than confirmed announcements.
+    if contains_any(searchable, ["report", "reports"]):
+        if contains_any(searchable, REPORT_SUBJECTS):
+            if contains_any(
+                searchable,
+                ["early", "late", "expected", "possible", "potential", "december", "january"],
+            ):
+                return "RUMOUR"
+
+    return None
+
+
 def read_sources():
     articles = []
 
@@ -171,12 +233,13 @@ def read_sources():
 
         for entry in entries:
             title = clean_text(entry.get("title", ""))
+
             description = clean_text(
                 entry.get("summary", "")
                 or entry.get("description", "")
             )
-            url = entry.get("link", "")
 
+            url = entry.get("link", "")
             searchable = normalise(title + " " + description)
 
             published = get_entry_date(entry)
@@ -193,30 +256,20 @@ def read_sources():
 
             stats["mw4"] += 1
 
-            # DIAGNOSTIC: show every recent MW4 article.
             print()
-            print("MW4 ARTICLE FOUND")
-            print("TITLE:", title)
-            print("DESCRIPTION:", description[:700])
-            print("LINK:", url)
-            print("SEARCHABLE TEXT:", searchable[:700])
+            print("MW4 ARTICLE:", title)
 
             if contains_any(searchable, REJECTION_TERMS):
-                print("DECISION: REJECTED - possible debunk or fake report")
+                print("REJECTED: possible debunk or fake report")
                 stats["rejected"] += 1
                 continue
 
-            if not contains_any(searchable, RUMOUR_TERMS):
-                print("DECISION: REJECTED - no rumour/leak keyword recognised")
+            category = identify_rumour(title, searchable)
+
+            if not category:
+                print("REJECTED: ordinary news, guide or update")
                 stats["rejected"] += 1
                 continue
-
-            stats["rumour"] += 1
-
-            if contains_any(searchable, LEAK_TERMS):
-                category = "LEAK"
-            else:
-                category = "RUMOUR"
 
             original_source = source_name
 
@@ -235,9 +288,12 @@ def read_sources():
             }
 
             articles.append(article)
+            stats["rumour"] += 1
             stats["accepted"] += 1
 
-            print("DECISION: ACCEPTED -", category)
+            print("ACCEPTED:", category)
+            print("SOURCE:", original_source)
+            print("LINK:", url)
 
         print()
         print("SOURCE RESULTS:")
@@ -247,8 +303,8 @@ def read_sources():
         print("ACCEPTED:", stats["accepted"])
         print("REJECTED:", stats["rejected"])
 
-    # Remove duplicate links.
     unique_articles = {}
+
     for article in articles:
         unique_articles[article["link"]] = article
 
@@ -287,7 +343,10 @@ def create_rss(articles):
     for article in articles:
         item = ET.SubElement(channel, "item")
 
-        title = f"[{article['category']}] [MW4] {article['title']}"
+        title = (
+            f"[{article['category']}] "
+            f"[MW4] {article['title']}"
+        )
 
         ET.SubElement(item, "title").text = title
         ET.SubElement(item, "link").text = article["link"]
@@ -329,9 +388,9 @@ def main():
     print("Starting MW4 Rumours & Leaks collector...")
     print("Game filter: MODERN WARFARE 4 ONLY")
     print("Period: Last", DAYS_BACK, "days")
-    print("Official news and unrelated COD games are excluded.")
+    print("Speculative reports and leaks are included.")
+    print("Ordinary news and unrelated COD games are excluded.")
     print("Unverified claims will be labelled.")
-    print("Diagnostic mode: ON")
 
     articles = read_sources()
     create_rss(articles)
