@@ -36,6 +36,20 @@ COD_PAGES = {
     "Official Call of Duty": "https://www.callofduty.com/blog",
     "Dexerto": "https://www.dexerto.com/call-of-duty/",
     "GamesRadar+": "https://www.gamesradar.com/games/fps/call-of-duty/",
+    "Insider Gaming MW4": (
+        "https://insider-gaming.com/games/call-of-duty-modern-warfare-4/"
+    ),
+}
+
+# Important COD articles to check directly, even if they disappear
+# from the latest-news lists or general RSS feeds.
+PRIORITY_ARTICLES = {
+    "Insider Gaming": [
+        (
+            "https://insider-gaming.com/"
+            "modern-warfare-4-ranked-mode-coming-in-season-2/"
+        ),
+    ],
 }
 
 COD_TERMS = [
@@ -94,8 +108,6 @@ EXCLUDED_TERMS = [
     "canceled project",
 ]
 
-# Exclude historical hypothetical stories about old experiments.
-# This requires both hypothetical wording and an experiment/concept reference.
 HISTORICAL_SPECULATION_PATTERNS = [
     r"\b(might|could|would)\s+have\b.*\b(experiment|prototype|concept)\b",
     r"\b(if|had)\b.*\b(experiment|prototype|concept)\b.*\b(panned out|worked out|gone ahead)\b",
@@ -449,6 +461,13 @@ def is_article_url(source, url):
 
         return len(parts) > index + 1
 
+    if source == "Insider Gaming MW4":
+        return (
+            parsed.netloc.lower().endswith("insider-gaming.com")
+            and len(parts) == 1
+            and "-" in parts[0]
+        )
+
     return False
 
 
@@ -600,6 +619,44 @@ def read_cod_pages(articles):
             print(f"COD page could not be read: {error}")
 
 
+def read_priority_articles(articles):
+    print()
+    print("CHECKING PRIORITY COD ARTICLES")
+
+    for source, article_urls in PRIORITY_ARTICLES.items():
+        for article_url in article_urls:
+            print()
+            print(f"PRIORITY ARTICLE: {source}")
+            print(f"URL: {article_url}")
+
+            details = get_page_details(article_url)
+
+            if not details:
+                print("Could not retrieve priority article.")
+                continue
+
+            accepted_before = len(articles)
+
+            add_article(
+                articles,
+                details["title"],
+                article_url,
+                source,
+                details["date"],
+                details["description"],
+            )
+
+            if len(articles) > accepted_before:
+                print(f"ACCEPTED: {details['title']}")
+            elif normalise_url(article_url) in articles:
+                print("Already collected.")
+            else:
+                print(
+                    "Not added. It may be outside the date window "
+                    "or may not pass the COD news filter."
+                )
+
+
 def create_rss(articles):
     root = ET.Element(
         "rss",
@@ -697,12 +754,17 @@ def main():
     print(
         "News, updates, patch notes, guides and tips are included."
     )
+    print(
+        "Insider Gaming MW4 page and priority Ranked article checks "
+        "are enabled."
+    )
     print(f"Only articles from the last {DAYS_BACK} days are included.")
 
     articles = {}
 
     read_rss_sources(articles)
     read_cod_pages(articles)
+    read_priority_articles(articles)
     create_rss(articles)
 
 
