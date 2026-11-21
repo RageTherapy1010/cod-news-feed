@@ -17,8 +17,6 @@ OUTPUT_FILE = "cod-rumours.xml"
 
 USER_AGENT = "Mozilla/5.0 (compatible; RageTherapyRSS/1.0)"
 
-# GameRiv has a dedicated Call of Duty feed.
-# The other sources are general gaming RSS feeds.
 RSS_SOURCES = {
     "GameRiv COD": {
         "url": "https://gameriv.com/call-of-duty/feed/",
@@ -299,6 +297,15 @@ def read_sources():
                     continue
 
                 stats["cod"] += 1
+
+                print(
+                    "RECENT COD ARTICLE:",
+                    title,
+                    "| DATE:",
+                    article_date.strftime("%Y-%m-%d"),
+                    "| SOURCE:",
+                    source,
+                )
 
                 if not contains_term(searchable, RUMOUR_TERMS):
                     stats["rejected"] += 1
