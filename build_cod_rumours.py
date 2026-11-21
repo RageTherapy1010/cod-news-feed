@@ -6,7 +6,7 @@ import re
 import urllib.request
 import xml.etree.ElementTree as ET
 from html import unescape
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit, urlencode
 
 import feedparser
 
@@ -15,80 +15,39 @@ DAYS_BACK = 14
 MAX_ARTICLES = 50
 OUTPUT_FILE = "cod-rumours.xml"
 
-USER_AGENT = "Mozilla/5.0 (compatible; RageTherapyRSS/1.0)"
+USER_AGENT = "Mozilla/5.0 (compatible; RageTherapyMW4RSS/1.0)"
+
+GOOGLE_NEWS_SEARCHES = [
+    '"Modern Warfare 4" (leak OR leaked OR datamine OR rumour OR rumor OR unconfirmed)',
+    '"MW4" (leak OR leaked OR datamine OR rumour OR rumor OR unconfirmed)',
+    '"Modern Warfare IV" (leak OR leaked OR datamine OR rumour OR rumor)',
+]
 
 RSS_SOURCES = {
-    "GameRiv COD": {
-        "url": "https://gameriv.com/call-of-duty/feed/",
-        "cod_specific": True,
-    },
-    "Dexerto": {
-        "url": "https://www.dexerto.com/feed/",
-        "cod_specific": False,
-    },
-    "GamesRadar+": {
-        "url": "https://www.gamesradar.com/feeds.xml",
-        "cod_specific": False,
-    },
-    "Eurogamer": {
-        "url": "https://www.eurogamer.net/feed",
-        "cod_specific": False,
-    },
-    "VGC": {
-        "url": "https://www.videogameschronicle.com/feed/",
-        "cod_specific": False,
-    },
+    "GameRiv COD": "https://gameriv.com/call-of-duty/feed/",
 }
 
-COD_TERMS = [
-    "call of duty",
-    "black ops",
-    "modern warfare",
-    "warzone",
-    "cod mobile",
-    "codm",
-    "dmz",
+
+MW4_TERMS = [
+    "modern warfare 4",
+    "modern warfare iv",
     "mw4",
-    "mw3",
-    "mw2",
 ]
 
 RUMOUR_TERMS = [
-    "rumour",
-    "rumor",
-    "rumoured",
-    "rumored",
-    "leak",
-    "leaked",
-    "leaker",
-    "leaks",
-    "datamine",
-    "datamined",
-    "data mine",
-    "unconfirmed",
-    "unverified",
-    "allegedly",
-    "alleged",
-    "supposedly",
-    "speculation",
-    "speculated",
-    "insider claims",
-    "insider says",
+    "rumour", "rumor", "rumoured", "rumored",
+    "leak", "leaked", "leaker", "leaks",
+    "datamine", "datamined", "data mine",
+    "unconfirmed", "unverified",
+    "allegedly", "alleged", "supposedly",
+    "speculation", "speculated",
+    "insider claims", "insider says",
     "reportedly",
-    "could be coming",
-    "may be coming",
-    "might be coming",
-    "is said to be",
 ]
 
 LEAK_TERMS = [
-    "leak",
-    "leaked",
-    "leaker",
-    "leaks",
-    "datamine",
-    "datamined",
-    "data mine",
+    "leak", "leaked", "leaker", "leaks",
+    "datamine", "datamined", "data mine",
 ]
 
 REJECTION_TERMS = [
@@ -100,17 +59,7 @@ REJECTION_TERMS = [
     "false rumor",
     "rumour is false",
     "rumor is false",
-    "denies rumours",
-    "denies rumors",
-    "denies report",
-    "officially confirmed",
-    "official announcement",
-    "officially announced",
-    "officially revealed",
-    "confirmed by activision",
-    "activision confirms",
-    "treyarch confirms",
-    "infinity ward confirms",
+    "debunked leak",
 ]
 
 
@@ -207,6 +156,10 @@ def is_recent(article_date):
     return article_date >= cutoff
 
 
+def is_mw4_article(text):
+    return contains_term(text, MW4_TERMS)
+
+
 def get_game_mode(text):
     text = text.lower()
 
@@ -222,7 +175,31 @@ def get_game_mode(text):
     if "multiplayer" in text:
         return "MULTIPLAYER"
 
-    return "CALL OF DUTY"
+    if "campaign" in text:
+        return "CAMPAIGN"
+
+    return "MODERN WARFARE 4"
+
+
+def get_rss_sources():
+    sources = dict(RSS_SOURCES)
+
+    for index, query in enumerate(GOOGLE_NEWS_SEARCHES, start=1):
+        search_query = query + " when:14d"
+
+        url = (
+            "https://news.google.com/rss/search?"
+            + urlencode({
+                "q": search_query,
+                "hl": "en-US",
+                "gl": "US",
+                "ceid": "US:en",
+            })
+        )
+
+        sources[f"Google News MW4 Search {index}"] = url
+
+    return sources
 
 
 def fetch_feed(url):
@@ -238,22 +215,34 @@ def fetch_feed(url):
         return feedparser.parse(response.read())
 
 
+def get_source_name(entry, fallback):
+    source_info = entry.get("source")
+
+    if source_info:
+        try:
+            name = clean_text(source_info.get("title", ""))
+
+            if name:
+                return name
+        except AttributeError:
+            pass
+
+    return fallback
+
+
 def read_sources():
     articles = {}
 
-    for source, settings in RSS_SOURCES.items():
-        feed_url = settings["url"]
-        cod_specific = settings["cod_specific"]
+    for source, feed_url in get_rss_sources().items():
 
         print()
-        print("=" * 50)
+        print("=" * 55)
         print("SOURCE:", source)
-        print("URL:", feed_url)
 
         stats = {
             "received": 0,
             "recent": 0,
-            "cod": 0,
+            "mw4": 0,
             "rumour": 0,
             "accepted": 0,
             "rejected": 0,
@@ -276,7 +265,7 @@ def read_sources():
                     )
                 )
 
-                searchable = (title + " " + description).lower()
+                searchable = title + " " + description
 
                 if not title or not url:
                     stats["rejected"] += 1
@@ -290,33 +279,25 @@ def read_sources():
 
                 stats["recent"] += 1
 
-                if not cod_specific and not contains_term(
-                    searchable, COD_TERMS
-                ):
+                # Only Modern Warfare 4 content is allowed.
+                if not is_mw4_article(searchable):
                     stats["rejected"] += 1
                     continue
 
-                stats["cod"] += 1
+                stats["mw4"] += 1
 
-                print(
-                    "RECENT COD ARTICLE:",
-                    title,
-                    "| DATE:",
-                    article_date.strftime("%Y-%m-%d"),
-                    "| SOURCE:",
-                    source,
-                )
+                # Reject articles explicitly describing fake
+                # or debunked claims.
+                if contains_term(title, REJECTION_TERMS):
+                    stats["rejected"] += 1
+                    continue
 
+                # Only actual rumour, leak or datamine reports.
                 if not contains_term(searchable, RUMOUR_TERMS):
                     stats["rejected"] += 1
                     continue
 
                 stats["rumour"] += 1
-
-                if contains_term(searchable, REJECTION_TERMS):
-                    stats["rejected"] += 1
-                    print("Excluded as confirmed/debunked:", title)
-                    continue
 
                 kind = (
                     "LEAK"
@@ -325,6 +306,7 @@ def read_sources():
                 )
 
                 mode = get_game_mode(searchable)
+                article_source = get_source_name(entry, source)
 
                 if url in articles:
                     continue
@@ -332,7 +314,7 @@ def read_sources():
                 articles[url] = {
                     "title": title,
                     "url": url,
-                    "source": source,
+                    "source": article_source,
                     "date": article_date,
                     "kind": kind,
                     "mode": mode,
@@ -343,18 +325,15 @@ def read_sources():
                 print("ACCEPTED:", title)
                 print("TYPE:", kind)
                 print("MODE:", mode)
+                print("SOURCE:", article_source)
 
         except Exception as error:
             print("SOURCE ERROR:", error)
 
         print()
         print("SOURCE RESULTS:")
-        print("Received:", stats["received"])
-        print("Recent:", stats["recent"])
-        print("COD-related:", stats["cod"])
-        print("Rumour/leak matches:", stats["rumour"])
-        print("Accepted:", stats["accepted"])
-        print("Rejected:", stats["rejected"])
+        for name, value in stats.items():
+            print(name.upper() + ":", value)
 
     return articles
 
@@ -368,7 +347,7 @@ def create_rss(articles):
     channel = ET.SubElement(root, "channel")
 
     ET.SubElement(channel, "title").text = (
-        "Rage Therapy - COD Rumours & Leaks"
+        "Rage Therapy - MW4 Rumours & Leaks"
     )
 
     ET.SubElement(channel, "link").text = (
@@ -376,8 +355,8 @@ def create_rss(articles):
     )
 
     ET.SubElement(channel, "description").text = (
-        "Call of Duty rumours and leaks. "
-        "All posts are unconfirmed unless officially verified."
+        "Modern Warfare 4 rumours, leaks and datamines. "
+        "All unverified claims are clearly labelled."
     )
 
     ET.SubElement(channel, "language").text = "en"
@@ -393,7 +372,7 @@ def create_rss(articles):
 
         ET.SubElement(item, "title").text = (
             f"[{article['kind']}] "
-            f"[{article['mode']}] "
+            f"[MW4 - {article['mode']}] "
             f"{article['title']}"
         )
 
@@ -407,13 +386,14 @@ def create_rss(articles):
         ET.SubElement(item, "source").text = article["source"]
 
         ET.SubElement(item, "category").text = article["kind"]
+        ET.SubElement(item, "category").text = "MODERN WARFARE 4"
         ET.SubElement(item, "category").text = article["mode"]
 
         ET.SubElement(item, "description").text = (
-            "UNCONFIRMED: This report has not been officially "
-            "confirmed by Call of Duty. "
-            f"Source: {article['source']}. "
-            "Open the original article for details."
+            "UNCONFIRMED: This Modern Warfare 4 report "
+            "has not been officially verified. "
+            f"Reported by: {article['source']}. "
+            "Open the source link for the original report."
         )
 
     tree = ET.ElementTree(root)
@@ -426,22 +406,20 @@ def create_rss(articles):
     )
 
     print()
-    print("=" * 50)
-    print("TOTAL COD RUMOURS & LEAKS:", len(sorted_articles))
-    print("RSS feed generated:", OUTPUT_FILE)
+    print("=" * 55)
+    print("TOTAL MW4 RUMOURS & LEAKS:", len(sorted_articles))
+    print("RSS FEED GENERATED:", OUTPUT_FILE)
 
     if not sorted_articles:
-        print(
-            "No articles passed the filters. "
-            "Check the source results above."
-        )
+        print("No articles passed the MW4 filters.")
 
 
 def main():
-    print("Starting COD Rumours & Leaks feed build...")
-    print("Only recent COD rumours and leaks are included.")
-    print("Officially confirmed and debunked stories are excluded.")
-    print("Articles are labelled as unconfirmed.")
+    print("Starting MW4 Rumours & Leaks collector...")
+    print("Game filter: MODERN WARFARE 4 ONLY")
+    print("Period: Last", DAYS_BACK, "days")
+    print("Official news and unrelated COD games are excluded.")
+    print("Unverified claims will be labelled.")
 
     articles = read_sources()
     create_rss(articles)
