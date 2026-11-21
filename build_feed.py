@@ -29,6 +29,7 @@ RSS_SOURCES = {
     "GamesRadar+": "https://www.gamesradar.com/feeds.xml",
     "Eurogamer": "https://www.eurogamer.net/feed",
     "VGC": "https://www.videogameschronicle.com/feed/",
+    "Insider Gaming": "https://insider-gaming.com/feed/",
 }
 
 COD_PAGES = {
