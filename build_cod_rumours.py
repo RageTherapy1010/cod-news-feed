@@ -3,44 +3,56 @@ import calendar
 import datetime
 import email.utils
 import re
-import time
 import urllib.request
 import xml.etree.ElementTree as ET
+from html import unescape
+from urllib.parse import urlsplit, urlunsplit
 
 import feedparser
 
 
-# SETTINGS
 DAYS_BACK = 14
 MAX_ARTICLES = 50
 OUTPUT_FILE = "cod-rumours.xml"
 
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
-)
+USER_AGENT = "Mozilla/5.0 (compatible; RageTherapyRSS/1.0)"
 
-# Use the same four RSS sources as the existing COD news feed.
-# This script reads their RSS feeds only.
+# GameRiv has a dedicated Call of Duty feed.
+# The other sources are general gaming RSS feeds.
 RSS_SOURCES = {
-    "Dexerto": "https://www.dexerto.com/feed/",
-    "GamesRadar+": "https://www.gamesradar.com/feeds.xml",
-    "Eurogamer": "https://www.eurogamer.net/feed",
-    "VGC": "https://www.videogameschronicle.com/feed/",
+    "GameRiv COD": {
+        "url": "https://gameriv.com/call-of-duty/feed/",
+        "cod_specific": True,
+    },
+    "Dexerto": {
+        "url": "https://www.dexerto.com/feed/",
+        "cod_specific": False,
+    },
+    "GamesRadar+": {
+        "url": "https://www.gamesradar.com/feeds.xml",
+        "cod_specific": False,
+    },
+    "Eurogamer": {
+        "url": "https://www.eurogamer.net/feed",
+        "cod_specific": False,
+    },
+    "VGC": {
+        "url": "https://www.videogameschronicle.com/feed/",
+        "cod_specific": False,
+    },
 }
 
 COD_TERMS = [
     "call of duty",
-    "modern warfare",
     "black ops",
+    "modern warfare",
     "warzone",
     "cod mobile",
     "codm",
+    "dmz",
     "mw4",
-    "mwiii",
     "mw3",
     "mw2",
-    "dmz",
 ]
 
 RUMOUR_TERMS = [
@@ -57,14 +69,18 @@ RUMOUR_TERMS = [
     "data mine",
     "unconfirmed",
     "unverified",
-    "alleged",
     "allegedly",
+    "alleged",
     "supposedly",
     "speculation",
     "speculated",
     "insider claims",
     "insider says",
-    "according to insider",
+    "reportedly",
+    "could be coming",
+    "may be coming",
+    "might be coming",
+    "is said to be",
 ]
 
 LEAK_TERMS = [
@@ -77,45 +93,52 @@ LEAK_TERMS = [
     "data mine",
 ]
 
-
-def fetch_url(url):
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "application/rss+xml,application/xml,*/*",
-        },
-    )
-
-    with urllib.request.urlopen(request, timeout=25) as response:
-        return response.read()
+REJECTION_TERMS = [
+    "rumour debunked",
+    "rumor debunked",
+    "leak debunked",
+    "fake leak",
+    "false rumour",
+    "false rumor",
+    "rumour is false",
+    "rumor is false",
+    "denies rumours",
+    "denies rumors",
+    "denies report",
+    "officially confirmed",
+    "official announcement",
+    "officially announced",
+    "officially revealed",
+    "confirmed by activision",
+    "activision confirms",
+    "treyarch confirms",
+    "infinity ward confirms",
+]
 
 
 def clean_text(value):
-    from html import unescape
-
     value = unescape(str(value or ""))
     value = re.sub(r"<[^>]+>", " ", value)
     value = re.sub(r"\s+", " ", value)
-
     return value.strip()
 
 
 def normalise_url(url):
-    from urllib.parse import urlparse
-
     if not url:
         return ""
 
-    parsed = urlparse(url.strip())
+    parts = urlsplit(url.strip())
 
-    if parsed.scheme not in ("http", "https"):
+    if parts.scheme not in ("http", "https"):
         return ""
 
-    return parsed._replace(
-        fragment="",
-        query="",
-    ).geturl().rstrip("/")
+    return urlunsplit((
+        parts.scheme,
+        parts.netloc,
+        parts.path.rstrip("/"),
+        "",
+        "",
+    ))
 
 
 def contains_term(text, terms):
@@ -204,58 +227,100 @@ def get_game_mode(text):
     return "CALL OF DUTY"
 
 
+def fetch_feed(url):
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/rss+xml, application/xml, text/xml",
+        },
+    )
+
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return feedparser.parse(response.read())
+
+
 def read_sources():
     articles = {}
 
-    for source, feed_url in RSS_SOURCES.items():
+    for source, settings in RSS_SOURCES.items():
+        feed_url = settings["url"]
+        cod_specific = settings["cod_specific"]
+
         print()
+        print("=" * 50)
         print("SOURCE:", source)
         print("URL:", feed_url)
 
+        stats = {
+            "received": 0,
+            "recent": 0,
+            "cod": 0,
+            "rumour": 0,
+            "accepted": 0,
+            "rejected": 0,
+        }
+
         try:
-            feed_data = fetch_url(feed_url)
-            feed = feedparser.parse(feed_data)
+            feed = fetch_feed(feed_url)
+            stats["received"] = len(feed.entries)
 
-            print("Articles received:", len(feed.entries))
-
-            accepted_before = len(articles)
+            print("Articles received:", stats["received"])
 
             for entry in feed.entries:
                 title = clean_text(entry.get("title", ""))
                 url = normalise_url(entry.get("link", ""))
 
-                # Use the feed description for filtering only.
-                # We do not republish the original article text.
                 description = clean_text(
-                    entry.get("summary", entry.get("description", ""))
+                    entry.get(
+                        "summary",
+                        entry.get("description", ""),
+                    )
                 )
 
-                searchable_text = title + " " + description
+                searchable = (title + " " + description).lower()
 
                 if not title or not url:
-                    continue
-
-                if not contains_term(searchable_text, COD_TERMS):
-                    continue
-
-                if not contains_term(searchable_text, RUMOUR_TERMS):
+                    stats["rejected"] += 1
                     continue
 
                 article_date = parse_date(entry)
 
                 if not is_recent(article_date):
+                    stats["rejected"] += 1
                     continue
 
-                if url in articles:
+                stats["recent"] += 1
+
+                if not cod_specific and not contains_term(
+                    searchable, COD_TERMS
+                ):
+                    stats["rejected"] += 1
+                    continue
+
+                stats["cod"] += 1
+
+                if not contains_term(searchable, RUMOUR_TERMS):
+                    stats["rejected"] += 1
+                    continue
+
+                stats["rumour"] += 1
+
+                if contains_term(searchable, REJECTION_TERMS):
+                    stats["rejected"] += 1
+                    print("Excluded as confirmed/debunked:", title)
                     continue
 
                 kind = (
                     "LEAK"
-                    if contains_term(searchable_text, LEAK_TERMS)
+                    if contains_term(searchable, LEAK_TERMS)
                     else "RUMOUR"
                 )
 
-                mode = get_game_mode(searchable_text)
+                mode = get_game_mode(searchable)
+
+                if url in articles:
+                    continue
 
                 articles[url] = {
                     "title": title,
@@ -266,13 +331,23 @@ def read_sources():
                     "mode": mode,
                 }
 
-            print(
-                "COD rumours/leaks accepted:",
-                len(articles) - accepted_before,
-            )
+                stats["accepted"] += 1
+
+                print("ACCEPTED:", title)
+                print("TYPE:", kind)
+                print("MODE:", mode)
 
         except Exception as error:
-            print("Source could not be read:", error)
+            print("SOURCE ERROR:", error)
+
+        print()
+        print("SOURCE RESULTS:")
+        print("Received:", stats["received"])
+        print("Recent:", stats["recent"])
+        print("COD-related:", stats["cod"])
+        print("Rumour/leak matches:", stats["rumour"])
+        print("Accepted:", stats["accepted"])
+        print("Rejected:", stats["rejected"])
 
     return articles
 
@@ -294,8 +369,8 @@ def create_rss(articles):
     )
 
     ET.SubElement(channel, "description").text = (
-        "Unconfirmed Call of Duty rumours and leaks. "
-        "All posts are unverified unless officially confirmed."
+        "Call of Duty rumours and leaks. "
+        "All posts are unconfirmed unless officially verified."
     )
 
     ET.SubElement(channel, "language").text = "en"
@@ -309,16 +384,13 @@ def create_rss(articles):
     for article in sorted_articles:
         item = ET.SubElement(channel, "item")
 
-        post_title = (
+        ET.SubElement(item, "title").text = (
             f"[{article['kind']}] "
             f"[{article['mode']}] "
             f"{article['title']}"
         )
 
-        ET.SubElement(item, "title").text = post_title
-
         ET.SubElement(item, "link").text = article["url"]
-
         ET.SubElement(item, "guid").text = article["url"]
 
         ET.SubElement(item, "pubDate").text = (
@@ -328,14 +400,13 @@ def create_rss(articles):
         ET.SubElement(item, "source").text = article["source"]
 
         ET.SubElement(item, "category").text = article["kind"]
-
         ET.SubElement(item, "category").text = article["mode"]
 
         ET.SubElement(item, "description").text = (
-            "UNCONFIRMED: This is a rumour or leak and has not "
-            "been officially confirmed. "
-            f"Original source: {article['source']}. "
-            "Open the source link for the original report."
+            "UNCONFIRMED: This report has not been officially "
+            "confirmed by Call of Duty. "
+            f"Source: {article['source']}. "
+            "Open the original article for details."
         )
 
     tree = ET.ElementTree(root)
@@ -348,43 +419,24 @@ def create_rss(articles):
     )
 
     print()
+    print("=" * 50)
     print("TOTAL COD RUMOURS & LEAKS:", len(sorted_articles))
-    print("RSS feed successfully generated:", OUTPUT_FILE)
+    print("RSS feed generated:", OUTPUT_FILE)
 
-    print()
-    print("FINAL ARTICLE LIST:")
-
-    for article in sorted_articles:
+    if not sorted_articles:
         print(
-            article["date"].strftime("%Y-%m-%d"),
-            "|",
-            article["kind"],
-            "|",
-            article["mode"],
-            "|",
-            article["source"],
-            "|",
-            article["title"],
+            "No articles passed the filters. "
+            "Check the source results above."
         )
 
 
 def main():
     print("Starting COD Rumours & Leaks feed build...")
-
-    print(
-        "Only Call of Duty-related rumours and leaks are included."
-    )
-
-    print(
-        "Articles are labelled as unconfirmed."
-    )
-
-    print(
-        f"Only articles from the last {DAYS_BACK} days are included."
-    )
+    print("Only recent COD rumours and leaks are included.")
+    print("Officially confirmed and debunked stories are excluded.")
+    print("Articles are labelled as unconfirmed.")
 
     articles = read_sources()
-
     create_rss(articles)
 
 
