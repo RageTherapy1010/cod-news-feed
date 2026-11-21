@@ -41,16 +41,6 @@ COD_PAGES = {
     ),
 }
 
-# Important COD articles to check directly.
-PRIORITY_ARTICLES = {
-    "Insider Gaming": [
-        (
-            "https://insider-gaming.com/"
-            "modern-warfare-4-ranked-mode-coming-in-season-2/"
-        ),
-    ],
-}
-
 COD_TERMS = [
     "call of duty",
     "modern warfare",
@@ -618,44 +608,6 @@ def read_cod_pages(articles):
             print(f"COD page could not be read: {error}")
 
 
-def read_priority_articles(articles):
-    print()
-    print("CHECKING PRIORITY COD ARTICLES")
-
-    for source, article_urls in PRIORITY_ARTICLES.items():
-        for article_url in article_urls:
-            print()
-            print(f"PRIORITY ARTICLE: {source}")
-            print(f"URL: {article_url}")
-
-            details = get_page_details(article_url)
-
-            if not details:
-                print("Could not retrieve priority article.")
-                continue
-
-            accepted_before = len(articles)
-
-            add_article(
-                articles,
-                details["title"],
-                article_url,
-                source,
-                details["date"],
-                details["description"],
-            )
-
-            if len(articles) > accepted_before:
-                print(f"ACCEPTED: {details['title']}")
-            elif normalise_url(article_url) in articles:
-                print("Already collected.")
-            else:
-                print(
-                    "Not added. It may be outside the date window "
-                    "or may not pass the COD news filter."
-                )
-
-
 def create_rss(articles):
     root = ET.Element(
         "rss",
@@ -683,31 +635,7 @@ def create_rss(articles):
 
     ET.SubElement(channel, "language").text = "en"
 
-    # One priority reannouncement for Ranked Play.
-    # Its unique GUID stays the same on every build.
-    ranked_url = (
-        "https://insider-gaming.com/"
-        "modern-warfare-4-ranked-mode-coming-in-season-2"
-    )
-
-    priority_article = {
-        "title": (
-            "[RANKED PLAY UPDATE] "
-            "Modern Warfare 4 Ranked Mode Coming in Season 2"
-        ),
-        "url": ranked_url,
-        "guid": ranked_url + "#rage-therapy-ranked-priority",
-        "source": "Rage Therapy Priority Update",
-        "date": datetime.datetime.now(datetime.timezone.utc),
-        "description": (
-            "Priority reannouncement for Ranked Play. "
-            "Originally published by Insider Gaming on "
-            "11 November 2026. "
-            "Original source: " + ranked_url
-        ),
-    }
-
-    all_articles = list(articles.values()) + [priority_article]
+    all_articles = list(articles.values())
 
     sorted_articles = sorted(
         all_articles,
@@ -727,7 +655,7 @@ def create_rss(articles):
         )
 
         ET.SubElement(item, "guid").text = (
-            article.get("guid", article["url"])
+            article["url"]
         )
 
         ET.SubElement(item, "pubDate").text = (
@@ -779,18 +707,12 @@ def main():
     print(
         "News, updates, patch notes, guides and tips are included."
     )
-    print(
-        "Insider Gaming MW4 page and priority Ranked article checks "
-        "are enabled."
-    )
-    print("Ranked Play priority reannouncement is enabled.")
     print(f"Only articles from the last {DAYS_BACK} days are included.")
 
     articles = {}
 
     read_rss_sources(articles)
     read_cod_pages(articles)
-    read_priority_articles(articles)
     create_rss(articles)
 
 
