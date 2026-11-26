@@ -62,7 +62,17 @@ REJECTION_TERMS = [
     "fake rumor",
 ]
 
-# Ordinary confirmed updates and patch coverage.
+# Reject old articles that are being resurfaced by search feeds.
+# These are not current MW4 rumours or leaks.
+OUTDATED_CONTEXT_TERMS = [
+    "call of duty 2019",
+    "modern warfare 2019",
+    "modern warfare (2019)",
+    "modern warfare released in 2019",
+    "everything we know so far – modern warfare 4 leaks",
+    "everything we know so far - modern warfare 4 leaks",
+]
+
 CONFIRMED_TITLE_TERMS = [
     "patch notes",
     "patch update",
@@ -77,14 +87,10 @@ CONFIRMED_TITLE_TERMS = [
     "now available",
 ]
 
-# This particular Ranked Mode article reports an official
-# developer confirmation, so it must not enter the rumours feed.
 CONFIRMED_ARTICLE_TITLE_PHRASES = [
     "modern warfare 4 ranked mode coming in season 2",
 ]
 
-# These phrases indicate that the article is reporting
-# an explicit confirmation from the developers or publisher.
 OFFICIAL_CONFIRMATION_TERMS = [
     "infinity ward confirmed",
     "activision confirmed",
@@ -250,21 +256,26 @@ def fetch_feed(url):
         return feedparser.parse(response.read())
 
 
+def is_outdated_article(title, searchable):
+    title = normalise(title)
+    searchable = normalise(searchable)
+
+    return (
+        contains_any(title, OUTDATED_CONTEXT_TERMS)
+        or contains_any(searchable, OUTDATED_CONTEXT_TERMS)
+    )
+
+
 def is_confirmed_article(title, searchable):
     title = normalise(title)
     searchable = normalise(searchable)
 
-    # Exclude the known Ranked Mode article because it reports
-    # an official developer confirmation.
     if contains_any(title, CONFIRMED_ARTICLE_TITLE_PHRASES):
         return True
 
-    # Exclude headlines that clearly describe confirmed updates.
     if contains_any(title, CONFIRMED_TITLE_TERMS):
         return True
 
-    # Exclude articles whose supplied text explicitly says
-    # the publisher or developers have confirmed the information.
     if contains_any(searchable, OFFICIAL_CONFIRMATION_TERMS):
         return True
 
@@ -275,11 +286,12 @@ def identify_rumour(title, searchable):
     title = normalise(title)
     searchable = normalise(searchable)
 
-    # Confirmed information must never be labelled a rumour.
+    if is_outdated_article(title, searchable):
+        return None
+
     if is_confirmed_article(title, searchable):
         return None
 
-    # Reject fake or debunked claims.
     if contains_any(searchable, REJECTION_TERMS):
         return None
 
@@ -291,7 +303,6 @@ def identify_rumour(title, searchable):
     if contains_any(title, RUMOUR_TITLE_TERMS):
         return "RUMOUR"
 
-    # A report headline must concern a relevant MW4 subject.
     has_report_headline = bool(
         re.search(r"\b(report|reports|reportedly)\b", title)
     )
@@ -304,10 +315,6 @@ def identify_rumour(title, searchable):
     if has_report_headline and has_relevant_subject:
         return "RUMOUR"
 
-    # Future-content speculation needs:
-    # 1. A future-content signal in the headline.
-    # 2. A relevant MW4 subject in the headline.
-    # 3. Reporting evidence in the supplied article text.
     has_future_headline = contains_any(
         title,
         FUTURE_CONTENT_TERMS,
@@ -393,6 +400,11 @@ def read_sources():
 
             print()
             print("MW4 ARTICLE:", title)
+
+            if is_outdated_article(title, searchable):
+                print("REJECTED: outdated article or historical MW4 context")
+                stats["rejected"] += 1
+                continue
 
             if contains_any(searchable, REJECTION_TERMS):
                 print("REJECTED: possible debunk or fake report")
@@ -541,6 +553,7 @@ def main():
     print("Speculative reports are labelled RUMOUR.")
     print("Officially confirmed information is excluded.")
     print("Ordinary confirmed news, guides and updates are excluded.")
+    print("Outdated historical articles are excluded.")
     print("Unverified claims will be labelled.")
 
     articles = read_sources()
