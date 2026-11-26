@@ -25,7 +25,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install feedparser googlenewsdecoder==0.2.2
+        run: pip install feedparser googlenewsdecoder==0.2.2 selectolax==0.4.13
 
       - name: Build COD News RSS feed
         run: python build_feed.py
