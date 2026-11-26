@@ -22,10 +22,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.x"
+          python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install feedparser googlenewsdecoder==0.2.2 "selectolax<1.0"
+        run: pip install feedparser googlenewsdecoder==0.2.2
 
       - name: Build COD News RSS feed
         run: python build_feed.py
