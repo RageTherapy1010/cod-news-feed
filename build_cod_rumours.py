@@ -34,6 +34,17 @@ MW4_TERMS = [
     "mw4",
 ]
 
+# Exclude old articles resurfacing in Google News searches.
+OUTDATED_CONTEXT_TERMS = [
+    "call of duty 2019",
+    "modern warfare 2019",
+    "modern warfare 2019 leaks",
+    "modern warfare 2019 rumors",
+    "modern warfare 2019 rumours",
+    "e3 2019",
+    "everything we know so far",
+]
+
 ORDINARY_NEWS_TERMS = [
     "known issues",
     "patch notes",
@@ -214,6 +225,7 @@ def get_entry_date(entry):
 
     for field in ("published", "updated"):
         value = entry.get(field)
+
         if value:
             try:
                 parsed_date = email.utils.parsedate_to_datetime(value)
@@ -266,8 +278,7 @@ def resolve_article_link(url):
     """
     Decode Google News article URLs into direct publisher URLs.
 
-    If decoding fails, keep the original Google News URL so
-    the article link is never lost.
+    If decoding fails, keep the original Google News URL.
     """
     if not url:
         return url
@@ -313,12 +324,33 @@ def is_mw4_article(searchable):
     return contains_any(searchable, MW4_TERMS)
 
 
+def is_outdated_article(title, searchable):
+    """
+    Reject historical Modern Warfare articles that Google News
+    may resurface in current MW4 searches.
+    """
+    title_text = normalise(title)
+
+    if contains_any(title_text, OUTDATED_CONTEXT_TERMS):
+        return True
+
+    # Reject titles explicitly referring to the old 2019 COD era.
+    if re.search(r"\b2019\b", title_text):
+        return True
+
+    # Also reject older Modern Warfare 4 articles from the 2019 era
+    # when the year appears in the searchable article text.
+    if (
+        "modern warfare" in searchable
+        and re.search(r"\b2019\b", searchable)
+        and "modern warfare 4" in title_text
+    ):
+        return True
+
+    return False
+
+
 def is_ordinary_news(title, searchable):
-    """
-    Reject ordinary news before checking whether something looks
-    like a rumour. This prevents words in a news description from
-    accidentally making a confirmed article look unconfirmed.
-    """
     title_text = normalise(title)
 
     if contains_any(searchable, CONFIRMED_TERMS):
@@ -351,7 +383,7 @@ def is_ordinary_news(title, searchable):
 
 def identify_rumour(title, searchable):
     """
-    Only accept clear leak/rumour wording or a properly attributed
+    Only accept clear leak/rumour wording or an attributed
     speculative report. A question by itself is not enough.
     """
     title_text = normalise(title)
@@ -429,6 +461,11 @@ def read_sources():
 
             print()
             print("MW4 ARTICLE:", title)
+
+            if is_outdated_article(title, searchable):
+                print("REJECTED: historical or outdated MW4 article")
+                stats["rejected"] += 1
+                continue
 
             if contains_any(searchable, REJECTION_TERMS):
                 print("REJECTED: debunked or fake report")
@@ -568,6 +605,7 @@ def main():
     print("Period: Last", DAYS_BACK, "days")
     print("Only clear leaks and attributed speculation are accepted.")
     print("Confirmed news, guides and ordinary updates are excluded.")
+    print("Historical 2019 articles are excluded.")
     print("Unverified claims will be labelled.")
     print("Google News links will be decoded when possible.")
 
